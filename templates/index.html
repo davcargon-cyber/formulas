@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IOL Advisor</title>
+<link href="https://fonts.googleapis.com/css2?family=Overpass+Mono:wght@400;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #060810;
+  --surface: rgba(255,255,255,.025);
+  --border: rgba(255,255,255,.06);
+  --text: #b8bcc8;
+  --text2: rgba(255,255,255,.35);
+  --text3: rgba(255,255,255,.18);
+  --white: #fff;
+  --accent: #00d4aa;
+  --accent2: #00b4d8;
+  --warn: #ffd166;
+  --danger: #ff6b6b;
+  --mono: 'Overpass Mono', monospace;
+  --sans: 'Source Sans 3', system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ── */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,.012);
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand h1 { font-size: 17px; font-weight: 700; color: var(--white); letter-spacing: -.03em; }
+.brand small { display: block; font-size: 9.5px; color: var(--text3); letter-spacing: .1em; text-transform: uppercase; font-family: var(--mono); }
+.patient-tag { font-size: 12px; color: var(--text2); font-family: var(--mono); padding: 4px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+
+main { max-width: 860px; margin: 0 auto; padding: 24px 16px 60px; }
+
+/* ── Shared ── */
+.section { animation: fadeUp .35s ease; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }
+@keyframes spin { to { transform: rotate(360deg) } }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+.sec-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+.sec-title { font-size: 18px; font-weight: 700; color: var(--white); letter-spacing: -.02em; }
+.badge { padding: 3px 10px; background: rgba(0,212,170,.07); border: 1px solid rgba(0,212,170,.15); border-radius: 10px; font-size: 11px; color: var(--accent); font-family: var(--mono); }
+
+.error-bar { padding: 10px 14px; background: rgba(255,80,80,.06); border: 1px solid rgba(255,80,80,.15); border-radius: 8px; color: var(--danger); font-size: 13px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+.error-bar button { background: none; border: none; color: var(--danger); font-size: 18px; cursor: pointer; }
+
+.btn-primary {
+  padding: 11px 26px; background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: var(--bg); border: none; border-radius: 8px; font-size: 14px; font-weight: 700;
+  cursor: pointer; font-family: var(--sans); letter-spacing: -.01em; transition: opacity .2s;
+}
+.btn-primary:hover { opacity: .9; }
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+.btn-ghost {
+  padding: 10px 18px; background: transparent; border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text2); font-size: 13px; cursor: pointer; font-family: var(--sans); transition: border-color .2s;
+}
+.btn-ghost:hover { border-color: rgba(255,255,255,.15); }
+.btn-text { background: none; border: none; color: var(--text2); font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font-family: var(--sans); }
+.actions { display: flex; gap: 10px; margin-top: 22px; justify-content: flex-end; flex-wrap: wrap; }
+
+.hidden { display: none !important; }
+
+/* ── Upload ── */
+.upload-wrap { display: flex; flex-direction: column; align-items: center; padding-top: 36px; gap: 8px; }
+.hero-text { text-align: center; margin-bottom: 16px; }
+.hero-text h2 { font-size: 22px; font-weight: 700; color: var(--white); letter-spacing: -.02em; }
+.hero-text p { font-size: 14px; color: var(--text2); line-height: 1.6; margin-top: 6px; }
+.dropzone {
+  width: 100%; max-width: 480px; min-height: 210px;
+  border: 1.5px dashed rgba(0,212,170,.22); border-radius: 16px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 32px; cursor: pointer; background: rgba(0,212,170,.012); transition: border-color .2s, background .2s;
+}
+.dropzone:hover { border-color: rgba(0,212,170,.4); background: rgba(0,212,170,.025); }
+.dropzone.dragging { border-color: var(--accent); background: rgba(0,212,170,.04); }
+.drop-label { font-size: 15px; font-weight: 600; color: var(--white); margin-top: 10px; }
+.drop-hint { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.drop-cta { margin-top: 14px; padding: 8px 20px; background: rgba(0,212,170,.08); border: 1px solid rgba(0,212,170,.2); border-radius: 8px; color: var(--accent); font-size: 13px; font-weight: 600; }
+.spinner-small { width: 32px; height: 32px; border: 2.5px solid rgba(0,212,170,.12); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 10px; }
+.extract-status { text-align: center; }
+.extract-status p { font-size: 14px; color: var(--accent); font-weight: 600; }
+.extract-status small { font-size: 12px; color: var(--text3); font-family: var(--mono); }
+
+/* ── Review ── */
+.form-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px;
+}
+.field label { display: block; font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: .08em; font-family: var(--mono); margin-bottom: 3px; }
+.field .inp-wrap { position: relative; }
+.field input {
+  width: 100%; padding: 9px 10px; background: rgba(255,255,255,.03);
+  border: 1px solid var(--border); border-radius: 6px; color: var(--white);
+  font-size: 14px; font-family: var(--mono); outline: none; transition: border-color .2s;
+}
+.field input:focus { border-color: rgba(0,212,170,.5); background: rgba(0,212,170,.02); }
+.field .unit { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--text3); font-family: var(--mono); pointer-events: none; }
+
+.eye-toggle { display: flex; gap: 3px; }
+.eye-toggle button {
+  padding: 5px 14px; border: 1px solid var(--border); border-radius: 6px;
+  background: transparent; color: var(--text2); cursor: pointer; font-size: 13px;
+  font-weight: 600; font-family: var(--mono); transition: all .2s;
+}
+.eye-toggle button.active { background: rgba(0,212,170,.1); border-color: rgba(0,212,170,.4); color: var(--accent); }
+
+.summary-strip {
+  display: flex; align-items: center; gap: 16px; padding: 12px 16px; margin-top: 12px;
+  background: rgba(0,212,170,.02); border: 1px solid rgba(0,212,170,.07); border-radius: 8px;
+  font-family: var(--mono); font-size: 13px; flex-wrap: wrap;
+}
+.summary-strip .s-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: .1em; }
+.summary-strip .s-val { font-weight: 700; color: var(--white); }
+.summary-strip .sep { width: 1px; height: 24px; background: rgba(255,255,255,.06); }
+
+/* ── Loading ── */
+.loading-wrap { text-align: center; padding-top: 60px; }
+.loading-orb {
+  width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 12px;
+  background: radial-gradient(circle, rgba(0,212,170,.12), transparent 70%);
+  display: flex; align-items: center; justify-content: center;
+  animation: pulse 2.5s ease infinite;
+}
+.loading-orb .inner { width: 28px; height: 28px; border: 2.5px solid rgba(0,212,170,.15); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+.loading-wrap h3 { font-size: 17px; color: var(--white); font-weight: 700; }
+.loading-wrap .sub { font-size: 11px; color: var(--text3); font-family: var(--mono); margin-top: 4px; }
+.load-steps { margin-top: 24px; display: inline-flex; flex-direction: column; gap: 6px; text-align: left; }
+.load-step { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); font-family: var(--mono); animation: fadeUp .3s ease; }
+.load-step.done { opacity: .4; }
+.step-spinner { width: 14px; height: 14px; border: 2px solid rgba(0,212,170,.15); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; flex-shrink: 0; }
+.step-check { color: var(--accent); flex-shrink: 0; }
+
+/* ── Results ── */
+.formula-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.f-card {
+  padding: 14px 12px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; text-align: center; border-top: 2px solid var(--accent);
+}
+.f-card .f-name { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-family: var(--mono); margin-bottom: 8px; }
+.f-card .f-power { font-size: 28px; font-weight: 700; color: var(--white); font-family: var(--mono); line-height: 1; }
+.f-card .f-unit { font-size: 10px; color: var(--text3); margin-top: 2px; }
+.f-card .f-rx { font-size: 13px; font-weight: 600; font-family: var(--mono); margin-top: 8px; }
+
+.consensus {
+  padding: 14px 18px; margin-top: 14px; border-radius: 10px; border: 1px solid;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.consensus .con-label { font-weight: 700; font-family: var(--mono); font-size: 13px; }
+.consensus .con-stats { font-size: 13px; color: var(--text2); font-family: var(--mono); display: flex; gap: 16px; flex-wrap: wrap; }
+
+/* ── Recommendation ── */
+.rec-card {
+  background: rgba(0,212,170,.02); border: 1px solid rgba(0,212,170,.1);
+  border-radius: 12px; padding: 22px; margin-bottom: 16px; line-height: 1.7; font-size: 14px;
+  color: rgba(255,255,255,.6); white-space: pre-wrap;
+}
+.rec-card strong, .rec-card b { color: var(--white); }
+
+.disclaimer {
+  font-size: 11px; color: var(--text3); line-height: 1.6; padding: 14px 16px;
+  background: rgba(255,184,0,.02); border: 1px solid rgba(255,184,0,.06); border-radius: 8px; margin-top: 16px;
+}
+.disclaimer a { color: var(--accent); text-decoration: none; }
+
+/* ── Print ── */
+@media print {
+  body { background: #fff; color: #333; }
+  .header { border-color: #ddd; }
+  .f-card { border-color: #ddd; }
+  .rec-card { background: #f0faf7; border-color: #00D4AA; color: #333; }
+  .btn-primary, .btn-ghost, .btn-text, .dropzone { display: none; }
+}
+
+@media (max-width: 500px) {
+  .formula-grid { grid-template-columns: repeat(2, 1fr); }
+  .form-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="brand">
+    <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+      <circle cx="17" cy="17" r="15" stroke="url(#g)" stroke-width="1.2" fill="none"/>
+      <circle cx="17" cy="17" r="9.5" stroke="url(#g)" stroke-width="1" fill="none" opacity=".45"/>
+      <circle cx="17" cy="17" r="4.5" fill="url(#g)"/>
+      <defs><linearGradient id="g" x1="0" y1="0" x2="34" y2="34"><stop stop-color="#00D4AA"/><stop offset="1" stop-color="#00B4D8"/></linearGradient></defs>
+    </svg>
+    <div>
+      <h1>IOL Advisor</h1>
+      <small>Barrett UII · Kane · K6 · EVO · Hill-RBF · Hoffer QST · PEARL</small>
+    </div>
+  </div>
+  <div class="patient-tag" id="patientTag"></div>
+</header>
+
+<main>
+  <div id="errorBar" class="error-bar hidden">
+    <span id="errorText"></span>
+    <button onclick="hideError()">×</button>
+  </div>
+
+  <!-- ════════ UPLOAD ════════ -->
+  <div id="stepUpload" class="section">
+    <div class="upload-wrap">
+      <div class="hero-text">
+        <h2>Sube la biometría del paciente</h2>
+        <p>La IA extraerá los datos, los enviará a la ESCRS para calcular con las 7 fórmulas<br>propietarias reales, y te dará una recomendación basada en la evidencia.</p>
+      </div>
+      <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+        <div id="uploadIdle">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="display:block;margin:0 auto">
+            <rect x="8" y="12" width="32" height="24" rx="5" stroke="#00D4AA" stroke-width="1.2" stroke-dasharray="3.5 3" fill="none"/>
+            <path d="M24 19v12M20 24l4-4 4 4" stroke="#00D4AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p class="drop-label">PDF o imagen de biometría</p>
+          <p class="drop-hint">IOLMaster · Lenstar · Argos · Pentacam · AL-Scan</p>
+          <div class="drop-cta">Seleccionar archivo</div>
+        </div>
+        <div id="uploadLoading" class="extract-status hidden">
+          <div class="spinner-small"></div>
+          <p>Leyendo biometría...</p>
+          <small>AXL · ACD · K1 · K2 · LT · WTW · CCT</small>
+        </div>
+      </div>
+      <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp" hidden>
+      <button class="btn-text" onclick="goTo('review')">o introducir datos manualmente</button>
+    </div>
+  </div>
+
+  <!-- ════════ REVIEW ════════ -->
+  <div id="stepReview" class="section hidden">
+    <div class="sec-head">
+      <h2 class="sec-title">Verificar datos biométricos</h2>
+      <div class="eye-toggle">
+        <button id="btnOD" class="active" onclick="setEye('OD')">OD</button>
+        <button id="btnOS" onclick="setEye('OS')">OS</button>
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div class="field"><label>Longitud axial</label><div class="inp-wrap"><input id="fAxl" placeholder="23.50"><span class="unit">mm</span></div></div>
+      <div class="field"><label>Cámara anterior</label><div class="inp-wrap"><input id="fAcd" placeholder="3.12"><span class="unit">mm</span></div></div>
+      <div class="field"><label>K1 (plano)</label><div class="inp-wrap"><input id="fK1" placeholder="43.25"><span class="unit">D</span></div></div>
+      <div class="field"><label>K2 (curvo)</label><div class="inp-wrap"><input id="fK2" placeholder="44.00"><span class="unit">D</span></div></div>
+      <div class="field"><label>Grosor cristalino</label><div class="inp-wrap"><input id="fLt" placeholder="4.56"><span class="unit">mm</span></div></div>
+      <div class="field"><label>Blanco–blanco</label><div class="inp-wrap"><input id="fWtw" placeholder="11.80"><span class="unit">mm</span></div></div>
+      <div class="field"><label>Paquimetría</label><div class="inp-wrap"><input id="fCct" placeholder="545"><span class="unit">μm</span></div></div>
+      <div class="field"><label>Constante A</label><div class="inp-wrap"><input id="fAconst" placeholder="118.7" value="118.7"></div></div>
+    </div>
+
+    <div class="form-grid" style="grid-template-columns:1fr 1fr; margin-top:8px">
+      <div class="field"><label>Paciente</label><div class="inp-wrap"><input id="fPatient" placeholder="Nombre"></div></div>
+      <div class="field"><label>Modelo LIO</label><div class="inp-wrap"><input id="fIol" placeholder="SN60WF, ZCB00..."></div></div>
+    </div>
+
+    <div id="summaryStrip" class="summary-strip hidden"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goTo('upload')">← Atrás</button>
+      <button class="btn-primary" onclick="startCalculation()">Calcular 7 fórmulas →</button>
+    </div>
+  </div>
+
+  <!-- ════════ LOADING ════════ -->
+  <div id="stepLoading" class="section hidden">
+    <div class="loading-wrap">
+      <div class="loading-orb"><div class="inner"></div></div>
+      <h3>Calculando con 7 fórmulas</h3>
+      <p class="sub">Barrett UII · Kane · Cooke K6 · EVO 2.0 · Hill-RBF · Hoffer QST · PEARL-DGS</p>
+      <div class="load-steps" id="loadSteps"></div>
+    </div>
+  </div>
+
+  <!-- ════════ RESULTS ════════ -->
+  <div id="stepResults" class="section hidden">
+    <div class="sec-head">
+      <h2 class="sec-title">Resultados — 7 fórmulas</h2>
+      <span class="badge" id="resultsBadge"></span>
+    </div>
+    <div class="formula-grid" id="formulaGrid"></div>
+    <div id="consensusBox" class="consensus" style="display:none"></div>
+
+    <div class="sec-head" style="margin-top:24px">
+      <h2 class="sec-title">Recomendación clínica</h2>
+      <span class="badge" id="confBadge"></span>
+    </div>
+    <div id="recLoading" class="hidden" style="text-align:center;padding:30px">
+      <div class="spinner-small"></div>
+      <p style="color:var(--text2);margin-top:8px;font-size:13px">Generando recomendación...</p>
+    </div>
+    <div id="recCard" class="rec-card hidden"></div>
+
+    <div class="disclaimer">
+      <b>Aviso clínico:</b> Los resultados proceden de las calculadoras propietarias originales vía
+      <a href="https://iolcalculator.escrs.org" target="_blank">ESCRS</a> (web scraping autorizado por los autores).
+      La decisión final sobre fórmula y potencia es siempre responsabilidad del cirujano.
+      Verificar en <a href="https://iolcalc.ascrs.org" target="_blank">ASCRS</a> si hay dudas.
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goTo('review')">← Editar datos</button>
+      <button class="btn-ghost" onclick="resetAll()">Nuevo paciente</button>
+      <button class="btn-ghost" onclick="window.print()">Imprimir informe</button>
+    </div>
+  </div>
+</main>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────
+let bio = { eye: 'OD' };
+let escrsResults = null;
+
+const $ = id => document.getElementById(id);
+const steps = ['stepUpload','stepReview','stepLoading','stepResults'];
+
+function goTo(step) {
+  steps.forEach(s => $(s).classList.add('hidden'));
+  $('step' + step.charAt(0).toUpperCase() + step.slice(1)).classList.remove('hidden');
+  hideError();
+}
+
+function showError(msg) { $('errorText').textContent = msg; $('errorBar').classList.remove('hidden'); }
+function hideError() { $('errorBar').classList.add('hidden'); }
+
+// ─── Eye toggle ──────────────────────────────────────────────────────────
+function setEye(eye) {
+  bio.eye = eye;
+  $('btnOD').classList.toggle('active', eye === 'OD');
+  $('btnOS').classList.toggle('active', eye === 'OS');
+}
+
+// ─── File upload ─────────────────────────────────────────────────────────
+const dropzone = $('dropzone');
+const fileInput = $('fileInput');
+
+['dragenter','dragover'].forEach(e => dropzone.addEventListener(e, ev => { ev.preventDefault(); dropzone.classList.add('dragging'); }));
+['dragleave','drop'].forEach(e => dropzone.addEventListener(e, ev => { ev.preventDefault(); dropzone.classList.remove('dragging'); }));
+dropzone.addEventListener('drop', ev => { if(ev.dataTransfer.files[0]) uploadFile(ev.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if(fileInput.files[0]) uploadFile(fileInput.files[0]); });
+
+async function uploadFile(file) {
+  $('uploadIdle').classList.add('hidden');
+  $('uploadLoading').classList.remove('hidden');
+  hideError();
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await fetch('/extract', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (data.error) {
+      showError(data.error);
+      goTo('review');
+    } else {
+      populateForm(data);
+      goTo('review');
+    }
+  } catch(e) {
+    showError('Error de conexión. ¿Está el servidor funcionando?');
+    goTo('review');
+  } finally {
+    $('uploadIdle').classList.remove('hidden');
+    $('uploadLoading').classList.add('hidden');
+    fileInput.value = '';
+  }
+}
+
+function populateForm(data) {
+  if(data.axl) $('fAxl').value = data.axl;
+  if(data.acd) $('fAcd').value = data.acd;
+  if(data.k1) $('fK1').value = data.k1;
+  if(data.k2) $('fK2').value = data.k2;
+  if(data.lt) $('fLt').value = data.lt;
+  if(data.wtw) $('fWtw').value = data.wtw;
+  if(data.cct) $('fCct').value = data.cct;
+  if(data.a_const) $('fAconst').value = data.a_const;
+  if(data.patient) $('fPatient').value = data.patient;
+  if(data.iol_model) $('fIol').value = data.iol_model;
+  if(data.eye) setEye(data.eye);
+  updateSummary();
+}
+
+// ─── Summary strip ───────────────────────────────────────────────────────
+['fAxl','fK1','fK2','fAcd'].forEach(id => $(id).addEventListener('input', updateSummary));
+
+function updateSummary() {
+  const al = parseFloat($('fAxl').value);
+  const k1 = parseFloat($('fK1').value);
+  const k2 = parseFloat($('fK2').value);
+  const strip = $('summaryStrip');
+
+  if (!al || !k1 || !k2) { strip.classList.add('hidden'); return; }
+  strip.classList.remove('hidden');
+
+  const kAvg = ((k1+k2)/2).toFixed(2);
+  const astig = Math.abs(k2-k1).toFixed(2);
+  const type = al < 22 ? 'Corto' : al > 25.5 ? 'Largo' : 'Normal';
+
+  strip.innerHTML = `
+    <div><span class="s-label">AL</span><br><span class="s-val">${al} mm</span></div>
+    <div class="sep"></div>
+    <div><span class="s-label">K media</span><br><span class="s-val">${kAvg} D</span></div>
+    <div class="sep"></div>
+    <div><span class="s-label">Astig.</span><br><span class="s-val">${astig} D</span></div>
+    <div class="sep"></div>
+    <div><span class="s-label">Tipo</span><br><span class="s-val" style="color:var(--accent)">${type}</span></div>
+  `;
+
+  $('patientTag').textContent = ($('fPatient').value || '') + ' — ' + bio.eye;
+}
+
+// ─── Gather bio data ─────────────────────────────────────────────────────
+function gatherBio() {
+  bio = {
+    axl: parseFloat($('fAxl').value) || null,
+    acd: parseFloat($('fAcd').value) || null,
+    k1: parseFloat($('fK1').value) || null,
+    k2: parseFloat($('fK2').value) || null,
+    lt: parseFloat($('fLt').value) || null,
+    wtw: parseFloat($('fWtw').value) || null,
+    cct: parseFloat($('fCct').value) || null,
+    a_const: parseFloat($('fAconst').value) || 118.7,
+    patient: $('fPatient').value || '',
+    eye: bio.eye || 'OD',
+    iol_model: $('fIol').value || '',
+  };
+  return bio;
+}
+
+// ─── Loading steps ───────────────────────────────────────────────────────
+const LOAD_MESSAGES = [
+  'Conectando con ESCRS...',
+  'Aceptando términos...',
+  'Rellenando datos biométricos...',
+  'Lanzando cálculo (7 fórmulas)...',
+  'Esperando Barrett UII, Kane, K6...',
+  'Esperando EVO, Hill-RBF, Hoffer QST, PEARL...',
+  'Extrayendo resultados...',
+];
+
+function showLoadStep(index) {
+  const container = $('loadSteps');
+  // Mark previous as done
+  const prev = container.querySelectorAll('.load-step:not(.done)');
+  prev.forEach(el => {
+    el.classList.add('done');
+    el.querySelector('.step-spinner')?.replaceWith(Object.assign(document.createElement('span'), { className:'step-check', textContent:'✓' }));
+  });
+  // Add new
+  if (index < LOAD_MESSAGES.length) {
+    const div = document.createElement('div');
+    div.className = 'load-step';
+    div.innerHTML = `<div class="step-spinner"></div><span>${LOAD_MESSAGES[index]}</span>`;
+    container.appendChild(div);
+  }
+}
+
+// ─── Calculation flow ────────────────────────────────────────────────────
+async function startCalculation() {
+  gatherBio();
+  if (!bio.axl || !bio.k1 || !bio.k2) { showError('AL, K1 y K2 son obligatorios.'); return; }
+  hideError();
+  goTo('loading');
+
+  $('loadSteps').innerHTML = '';
+  let stepIdx = 0;
+  showLoadStep(stepIdx++);
+  const timer = setInterval(() => { if(stepIdx < LOAD_MESSAGES.length) showLoadStep(stepIdx++); }, 5000);
+
+  try {
+    // 1. ESCRS calculation
+    const calcRes = await fetch('/calculate', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(bio),
+    });
+    const calcData = await calcRes.json();
+
+    clearInterval(timer);
+
+    if (calcData.error) {
+      showError(calcData.error);
+      goTo('review');
+      return;
+    }
+
+    escrsResults = calcData;
+    renderResults(calcData);
+    goTo('results');
+
+    // 2. AI recommendation (async, shows after results)
+    $('recLoading').classList.remove('hidden');
+    $('recCard').classList.add('hidden');
+    $('confBadge').textContent = '';
+
+    const recRes = await fetch('/recommend', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ bio, results: calcData }),
+    });
+    const recData = await recRes.json();
+
+    $('recLoading').classList.add('hidden');
+    if (recData.error) {
+      $('recCard').textContent = 'Error: ' + recData.error;
+    } else {
+      $('recCard').innerHTML = formatRecommendation(recData.recommendation);
+    }
+    $('recCard').classList.remove('hidden');
+    $('confBadge').textContent = 'IA + Evidencia';
+
+  } catch(e) {
+    clearInterval(timer);
+    showError('Error de conexión con el servidor: ' + e.message);
+    goTo('review');
+  }
+}
+
+// ─── Render results ──────────────────────────────────────────────────────
+const FORMULA_COLORS = {
+  'Barrett Universal II': '#00D4AA',
+  'Kane': '#00B4D8',
+  'Cooke K6': '#7B68EE',
+  'EVO': '#FF8C42',
+  'Hill-RBF': '#E056A0',
+  'Hoffer QST': '#FFD166',
+  'PEARL-DGS': '#4ECDC4',
+};
+
+function renderResults(data) {
+  const grid = $('formulaGrid');
+  grid.innerHTML = '';
+
+  const formulas = data.formulas || {};
+  const al = bio.axl || '?';
+  const kAvg = bio.k1 && bio.k2 ? ((bio.k1+bio.k2)/2).toFixed(1) : '?';
+  $('resultsBadge').textContent = `${bio.eye} · AL ${al} · K̄ ${kAvg}`;
+
+  Object.entries(formulas).forEach(([name, d]) => {
+    const color = FORMULA_COLORS[name] || '#00D4AA';
+    const rx = d.rx || 0;
+    const rxColor = Math.abs(rx) < 0.3 ? 'var(--accent)' : rx < -0.5 ? 'var(--danger)' : 'var(--warn)';
+    const card = document.createElement('div');
+    card.className = 'f-card';
+    card.style.borderTopColor = color;
+    card.innerHTML = `
+      <div class="f-name" style="color:${color}">${name}</div>
+      <div class="f-power">${d.power.toFixed(1)}</div>
+      <div class="f-unit">dioptrías</div>
+      <div class="f-rx" style="color:${rxColor}">Rx: ${rx >= 0 ? '+' : ''}${rx.toFixed(2)} D</div>
+    `;
+    grid.appendChild(card);
+  });
+
+  // Consensus
+  const powers = Object.values(formulas).map(d => d.power);
+  if (powers.length >= 2) {
+    const min = Math.min(...powers), max = Math.max(...powers);
+    const rng = max - min;
+    const avg = powers.reduce((a,b) => a+b, 0) / powers.length;
+    const level = rng <= 0.5 ? 'high' : rng <= 1.0 ? 'moderate' : 'low';
+    const label = level === 'high' ? 'Alta concordancia' : level === 'moderate' ? 'Concordancia moderada' : 'Baja concordancia ⚠️';
+    const color = level === 'high' ? 'var(--accent)' : level === 'moderate' ? 'var(--warn)' : 'var(--danger)';
+    const bgAlpha = level === 'high' ? '0,212,170' : level === 'moderate' ? '255,209,102' : '255,107,107';
+
+    const box = $('consensusBox');
+    box.style.display = '';
+    box.style.borderColor = `rgba(${bgAlpha},.2)`;
+    box.style.background = `rgba(${bgAlpha},.03)`;
+    box.innerHTML = `
+      <span class="con-label" style="color:${color}">${label}</span>
+      <div class="con-stats">
+        <span>Rango: <b>${rng.toFixed(2)} D</b></span>
+        <span>Media: <b>${avg.toFixed(1)} D</b></span>
+        <span>Min: <b>${min.toFixed(1)}</b> · Max: <b>${max.toFixed(1)}</b></span>
+      </div>
+    `;
+  }
+}
+
+function formatRecommendation(text) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^### (.*)$/gm, '<strong style="color:var(--white);font-size:15px">$1</strong>')
+    .replace(/^## (.*)$/gm, '<strong style="color:var(--white);font-size:15px">$1</strong>')
+    .replace(/^# (.*)$/gm, '<strong style="color:var(--white);font-size:16px">$1</strong>')
+    .replace(/\n/g, '<br>');
+}
+
+// ─── Reset ───────────────────────────────────────────────────────────────
+function resetAll() {
+  ['fAxl','fAcd','fK1','fK2','fLt','fWtw','fCct','fPatient','fIol'].forEach(id => $(id).value = '');
+  $('fAconst').value = '118.7';
+  setEye('OD');
+  $('summaryStrip').classList.add('hidden');
+  $('patientTag').textContent = '';
+  escrsResults = null;
+  goTo('upload');
+}
+</script>
+</body>
+</html>
