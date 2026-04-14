@@ -423,6 +423,284 @@ Español, conciso, clínico."""}],
 
 
 # ─── Run ─────────────────────────────────────────────────────────────────────
+"""
+Kane Formula Test — Prueba de scraping con Playwright
+Añade este endpoint a tu app.py en Render para testear.
+Accede a: https://tu-app.onrender.com/test-kane
+"""
+
+# ─── Pega esto al final de tu app.py, ANTES de la línea "if __name__" ────
+
+@app.route("/test-kane")
+def test_kane():
+    """
+    Test: intenta automatizar la calculadora Kane con datos de ejemplo.
+    Devuelve un log detallado de qué pasa en cada paso.
+    """
+    import time
+    from playwright.sync_api import sync_playwright
+
+    # Datos de prueba
+    test_data = {
+        "a_const": 118.7,
+        "sex": "Male",
+        "axl": 23.50,
+        "k1": 43.25,
+        "k2": 44.00,
+        "acd": 3.12,
+        "lt": 4.56,
+        "cct": 545,
+    }
+
+    log_entries = []
+    def log(msg):
+        log_entries.append(f"{time.strftime('%H:%M:%S')} — {msg}")
+        app.logger.info(msg)
+
+    results = {"status": "started", "log": log_entries, "data": None}
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-blink-features=AutomationControlled"]
+        )
+        # Simular navegador real
+        context = browser.new_context(
+            viewport={"width": 1280, "height": 900},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            java_script_enabled=True,
+        )
+        page = context.new_page()
+
+        try:
+            # ── 1. Abrir la web ──
+            log("1. Abriendo iolformula.com...")
+            page.goto("https://www.iolformula.com/", wait_until="networkidle", timeout=30000)
+            page.wait_for_timeout(2000)
+            log(f"   URL actual: {page.url}")
+            log(f"   Título: {page.title()}")
+
+            # ── 2. Buscar el botón "I Agree" ──
+            log("2. Buscando botón 'I Agree'...")
+            body_text = page.inner_text("body")[:500]
+            log(f"   Texto visible (primeros 500 chars): {body_text[:200]}...")
+
+            agree_btn = None
+            for sel in [
+                "text=I Agree",
+                "button:has-text('I Agree')",
+                "a:has-text('I Agree')",
+                "input[value='I Agree']",
+                "#agree",
+                ".agree",
+            ]:
+                try:
+                    agree_btn = page.wait_for_selector(sel, timeout=3000)
+                    if agree_btn:
+                        log(f"   ✓ Encontrado con selector: {sel}")
+                        break
+                except:
+                    continue
+
+            if not agree_btn:
+                log("   ✗ No se encontró botón I Agree. Buscando todos los botones/links...")
+                buttons = page.query_selector_all("button, a, input[type='submit']")
+                for i, btn in enumerate(buttons):
+                    txt = btn.inner_text().strip()[:50] if btn.inner_text() else ""
+                    href = btn.get_attribute("href") or ""
+                    log(f"   [{i}] text='{txt}' href='{href}'")
+
+            # ── 3. Hacer clic en I Agree ──
+            if agree_btn:
+                log("3. Haciendo clic en 'I Agree'...")
+                agree_btn.click()
+                page.wait_for_timeout(3000)
+                log(f"   URL después del clic: {page.url}")
+            else:
+                log("3. SKIP — No hay botón, intentando navegar directo al calculator...")
+                page.goto("https://www.iolformula.com/calculator/", wait_until="networkidle", timeout=15000)
+                page.wait_for_timeout(2000)
+                log(f"   URL: {page.url}")
+
+            # ── 4. Detectar reCAPTCHA ──
+            log("4. Buscando reCAPTCHA...")
+            page_html = page.content()
+            has_recaptcha = "recaptcha" in page_html.lower()
+            has_grecaptcha = "grecaptcha" in page_html.lower()
+            has_captcha_frame = bool(page.query_selector("iframe[src*='recaptcha']"))
+            has_captcha_div = bool(page.query_selector(".g-recaptcha"))
+            log(f"   recaptcha en HTML: {has_recaptcha}")
+            log(f"   grecaptcha en HTML: {has_grecaptcha}")
+            log(f"   iframe recaptcha: {has_captcha_frame}")
+            log(f"   div .g-recaptcha: {has_captcha_div}")
+
+            if has_captcha_frame:
+                log("   ⚠ CAPTCHA IFRAME detectado — probablemente v2 (checkbox)")
+            elif has_recaptcha and not has_captcha_frame:
+                log("   ℹ reCAPTCHA detectado pero sin iframe — puede ser v3 (invisible)")
+
+            # ── 5. Listar todos los inputs del formulario ──
+            log("5. Escaneando formulario...")
+            all_inputs = page.query_selector_all("input, select, textarea")
+            log(f"   Total inputs encontrados: {len(all_inputs)}")
+            for i, inp in enumerate(all_inputs):
+                tag = inp.evaluate("el => el.tagName")
+                inp_type = inp.get_attribute("type") or ""
+                inp_name = inp.get_attribute("name") or ""
+                inp_id = inp.get_attribute("id") or ""
+                placeholder = inp.get_attribute("placeholder") or ""
+                inp_class = (inp.get_attribute("class") or "")[:40]
+                visible = inp.is_visible()
+                log(f"   [{i}] <{tag}> type='{inp_type}' name='{inp_name}' id='{inp_id}' ph='{placeholder}' class='{inp_class}' visible={visible}")
+
+            # ── 6. Listar labels ──
+            log("6. Escaneando labels...")
+            labels = page.query_selector_all("label")
+            for i, lbl in enumerate(labels):
+                txt = lbl.inner_text().strip()[:50]
+                for_attr = lbl.get_attribute("for") or ""
+                log(f"   [{i}] for='{for_attr}' text='{txt}'")
+
+            # ── 7. Intentar rellenar campos ──
+            log("7. Intentando rellenar datos de prueba...")
+            field_map = {
+                "a_const": str(test_data["a_const"]),
+                "axl": str(test_data["axl"]),
+                "k1": str(test_data["k1"]),
+                "k2": str(test_data["k2"]),
+                "acd": str(test_data["acd"]),
+                "lt": str(test_data["lt"]),
+                "cct": str(test_data["cct"]),
+            }
+            filled = 0
+            for inp in all_inputs:
+                inp_name = (inp.get_attribute("name") or "").lower()
+                inp_id = (inp.get_attribute("id") or "").lower()
+                placeholder = (inp.get_attribute("placeholder") or "").lower()
+                combined = f"{inp_name} {inp_id} {placeholder}"
+
+                for key, value in field_map.items():
+                    if key.lower() in combined or key.replace("_","") in combined:
+                        try:
+                            if inp.is_visible():
+                                inp.click()
+                                inp.fill(value)
+                                inp.dispatch_event("input")
+                                inp.dispatch_event("change")
+                                filled += 1
+                                log(f"   ✓ Rellenado '{key}' = {value} (via name/id/placeholder match)")
+                                break
+                        except Exception as e:
+                            log(f"   ✗ Error rellenando '{key}': {e}")
+
+            # Try by label matching too
+            label_patterns = {
+                r"a.const|constant": "a_const",
+                r"axial|length|\bal\b": "axl",
+                r"flat|k1": "k1",
+                r"steep|k2": "k2",
+                r"anterior|acd|chamber": "acd",
+                r"lens.*thick|\blt\b": "lt",
+                r"corneal.*thick|cct": "cct",
+            }
+            import re as regex
+            for lbl in labels:
+                txt = lbl.inner_text().strip().lower()
+                for pattern, key in label_patterns.items():
+                    if regex.search(pattern, txt) and key in field_map:
+                        for_id = lbl.get_attribute("for")
+                        inp = page.query_selector(f"#{for_id}") if for_id else lbl.query_selector("input, select")
+                        if inp and inp.is_visible():
+                            try:
+                                inp.click()
+                                inp.fill(field_map[key])
+                                inp.dispatch_event("input")
+                                inp.dispatch_event("change")
+                                filled += 1
+                                log(f"   ✓ Rellenado '{key}' = {field_map[key]} (via label '{txt}')")
+                            except Exception as e:
+                                log(f"   ✗ Error via label '{txt}': {e}")
+
+            log(f"   Total campos rellenados: {filled}")
+
+            # ── 8. Buscar botón Calculate ──
+            log("8. Buscando botón Calculate/Submit...")
+            for sel in [
+                "button:has-text('Calculate')",
+                "input[type='submit']",
+                "button[type='submit']",
+                "text=Calculate",
+                "button:has-text('Submit')",
+            ]:
+                try:
+                    calc_btn = page.wait_for_selector(sel, timeout=2000)
+                    if calc_btn:
+                        log(f"   ✓ Botón encontrado: {sel}")
+                        log("   Haciendo clic...")
+                        calc_btn.click()
+                        page.wait_for_timeout(5000)
+                        log(f"   URL después de Calculate: {page.url}")
+                        break
+                except:
+                    continue
+
+            # ── 9. Extraer resultados ──
+            log("9. Buscando resultados...")
+            page.wait_for_timeout(3000)
+            result_text = page.inner_text("body")
+
+            # Look for IOL power numbers
+            import re as regex
+            power_matches = regex.findall(r'(\d{1,2}\.\d{1,2})\s*(?:D|diopt)', result_text)
+            log(f"   Posibles potencias encontradas: {power_matches[:10]}")
+
+            # Look for tables
+            tables = page.query_selector_all("table")
+            log(f"   Tablas encontradas: {len(tables)}")
+            for i, table in enumerate(tables):
+                rows = table.query_selector_all("tr")
+                log(f"   Tabla [{i}]: {len(rows)} filas")
+                for j, row in enumerate(rows[:5]):
+                    cells = [c.inner_text().strip()[:20] for c in row.query_selector_all("td, th")]
+                    log(f"     Fila {j}: {cells}")
+
+            # Save page text for analysis
+            results["page_text"] = result_text[:3000]
+            results["status"] = "completed"
+
+            # Screenshot
+            try:
+                page.screenshot(path="/tmp/kane_test.png", full_page=True)
+                log("   Screenshot guardado en /tmp/kane_test.png")
+            except:
+                pass
+
+        except Exception as e:
+            log(f"ERROR: {e}")
+            results["status"] = "error"
+            results["error"] = str(e)
+            try:
+                page.screenshot(path="/tmp/kane_error.png", full_page=True)
+            except:
+                pass
+        finally:
+            browser.close()
+
+    results["log"] = log_entries
+    return jsonify(results)
+
+
+# ─── También un endpoint para ver el screenshot ──────────────────────────
+
+@app.route("/screenshot/<name>")
+def screenshot(name):
+    """Serve a screenshot file."""
+    from flask import send_file
+    path = f"/tmp/{name}.png"
+    try:
+        return send_file(path, mimetype="image/png")
+    except:
+        return "No screenshot available", 404
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
